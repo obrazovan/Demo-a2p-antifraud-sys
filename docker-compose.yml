@@ -1,0 +1,144 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: broker-rabbitmq
+    hostname: broker-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      antifraud-net:
+        aliases:
+          - broker-rabbitmq
+          - rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  redis:
+    image: redis:7-alpine
+    container_name: cache-redis
+    hostname: cache-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      antifraud-net:
+        aliases:
+          - cache-redis
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  postgres-rules:
+    image: postgres:15-alpine
+    container_name: db-postgres-rules
+    hostname: db-postgres-rules
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: rules_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    volumes:
+      - postgres_rules_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres-rules/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      antifraud-net:
+        aliases:
+          - db-postgres-rules
+          - postgres-rules
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rules_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-reputation:
+    image: postgres:15-alpine
+    container_name: db-postgres-reputation
+    hostname: db-postgres-reputation
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: reputation_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    volumes:
+      - postgres_reputation_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres-reputation/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      antifraud-net:
+        aliases:
+          - db-postgres-reputation
+          - postgres-reputation
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reputation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: db-clickhouse
+    hostname: db-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: analytics_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhousepassword
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infrastructure/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      antifraud-net:
+        aliases:
+          - db-clickhouse
+          - clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+networks:
+  antifraud-net:
+    name: antifraud-net
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    name: antifraud_rabbitmq_data
+  redis_data:
+    name: antifraud_redis_data
+  postgres_rules_data:
+    name: antifraud_postgres_rules_data
+  postgres_reputation_data:
+    name: antifraud_postgres_reputation_data
+  clickhouse_data:
+    name: antifraud_clickhouse_data
