@@ -126,6 +126,30 @@ services:
       retries: 5
       start_period: 15s
 
+  service-rule-engine:
+    build:
+      context: .
+      dockerfile: services/rule-engine/Dockerfile
+    container_name: service-rule-engine
+    hostname: service-rule-engine
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      SERVICE_NAME: service-rule-engine
+      HOST: 0.0.0.0
+      PORT: 8001
+      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db-postgres-rules:5432/rules_db
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres-rules:
+        condition: service_healthy
+    networks:
+      antifraud-net:
+        aliases:
+          - service-rule-engine
+          - rule-engine
+
 networks:
   antifraud-net:
     name: antifraud-net
