@@ -24,7 +24,7 @@ See [`system_architecture_specification.md`](./system_architecture_specification
 | :---: | :--- | :---: | :---: | :--- |
 | 1 | Infrastructure & Shared DTOs | Implemented | — | `docker-compose.yml`, `antifraud-net`, SQL init scripts, `shared/schemas.py`, `shared/logger.py` |
 | 2 | **Rule Engine Service** | Implemented | `8001` | FastAPI, asyncpg (`rules_db`), startup seed rules, `/api/v1/rules`, multi-stage Dockerfile, tests |
-| 3 | Reputation Service | Planned | `8002` | Blacklist management & fast lookup (`reputation_db`) |
+| 3 | **Reputation Service** | Implemented | `8002` | FastAPI, asyncpg (`reputation_db`), blacklist lookup & management, seed bad actors, JSON logs, tests |
 | 4 | Velocity Service | Planned | `8003` | Redis sliding-window rate counters |
 | 5 | Scoring Engine Service | Planned | `8004` | Parallel orchestration + RabbitMQ event publishing |
 | 6 | Analytics & Alerting Services | Planned | `8005` / `8006` | RabbitMQ consumers, ClickHouse bulk ingest, CEF audit alerts |
@@ -44,7 +44,7 @@ See [`system_architecture_specification.md`](./system_architecture_specification
 │   └── postgres-rules/
 ├── services/
 │   ├── rule-engine/            # Rule Engine microservice (FastAPI + PostgreSQL)
-│   ├── reputation/             # Reputation microservice (planned)
+│   ├── reputation/             # Reputation microservice (FastAPI + PostgreSQL)
 │   ├── velocity/               # Velocity microservice (planned)
 │   ├── scoring/                # Scoring Engine microservice (planned)
 │   ├── analytics/              # Analytics consumer & reporting (planned)
@@ -71,20 +71,27 @@ docker compose up -d --build
 docker compose ps
 ```
 
-### 3. Verify Rule Engine Service
-- Liveness check: `GET http://localhost:8001/health`
-- Readiness check (verifies PostgreSQL `rules_db`): `GET http://localhost:8001/ready`
-- Swagger UI: `http://localhost:8001/docs`
-- Active scoring rules: `GET http://localhost:8001/api/v1/rules`
+### 3. Verify Implemented Services
+- **Rule Engine Service (`8001`):**
+  - Liveness: `GET http://localhost:8001/health`
+  - Readiness (`rules_db`): `GET http://localhost:8001/ready`
+  - Swagger UI: `http://localhost:8001/docs`
+  - Active scoring rules: `GET http://localhost:8001/api/v1/rules`
+- **Reputation Service (`8002`):**
+  - Liveness: `GET http://localhost:8002/health`
+  - Readiness (`reputation_db`): `GET http://localhost:8002/ready`
+  - Swagger UI: `http://localhost:8002/docs`
+  - Check entities: `POST http://localhost:8002/api/v1/reputation/check`
+  - Add to blacklist: `POST http://localhost:8002/api/v1/reputation/blacklist`
 
 ---
 
 ## Running Tests
 
-Install Rule Engine dependencies and run the test suite:
+Install service dependencies and run the test suite:
 
 ```bash
-pip install -r services/rule-engine/requirements.txt
+pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt
 python -m pytest -v
 ```
 

@@ -150,6 +150,30 @@ services:
           - service-rule-engine
           - rule-engine
 
+  service-reputation:
+    build:
+      context: .
+      dockerfile: services/reputation/Dockerfile
+    container_name: service-reputation
+    hostname: service-reputation
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      SERVICE_NAME: service-reputation
+      HOST: 0.0.0.0
+      PORT: 8002
+      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db-postgres-reputation:5432/reputation_db
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres-reputation:
+        condition: service_healthy
+    networks:
+      antifraud-net:
+        aliases:
+          - service-reputation
+          - reputation
+
 networks:
   antifraud-net:
     name: antifraud-net
