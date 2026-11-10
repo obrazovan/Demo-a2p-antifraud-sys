@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt
+          pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt -r services/velocity/requirements.txt
 
       - name: Run pytest
         run: python -m pytest -v
