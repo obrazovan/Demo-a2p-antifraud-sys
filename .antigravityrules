@@ -1,0 +1,7 @@
+# Antigravity Rules for Project
+- Stack: Python 3.11, FastAPI, Pydantic v2, asyncpg, aio_pika, redis-py.
+- Code style: Fully typed, strict error handling, no raw stack traces in responses.
+- Logging: Structured JSON (timestamp, service_name, level, request_id, message).
+- Microservice boundaries: No shared databases! Each service has independent persistence.
+- Healthchecks: Every service MUST expose GET /health and GET /ready.
+- Completion rule: NEVER use placeholders like '# TODO' or 'pass' in core business logic.
