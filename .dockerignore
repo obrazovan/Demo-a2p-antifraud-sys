@@ -1,0 +1,43 @@
+# Git & CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentation & local reports
+*.md
+!README.md
+
+# Python caches & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Secrets & local env overrides
+.env
+.env.*
+docker-compose.override.yml
+
+# Local databases & test artifacts
+*.db
+*.db-wal
+*.db-shm
+tests/
+k8s/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

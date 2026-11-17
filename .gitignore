@@ -1,6 +1,7 @@
-# Implementation reports (local-only documentation, do not push to git)
+# Implementation reports & defense guides (local-only documentation, do not push to git)
 *implementation*.md
 stage*_implementation.md
+DEFENSE_GUIDE*.md
 
 # Python
 __pycache__/
