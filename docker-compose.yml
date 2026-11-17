@@ -1,4 +1,8 @@
 services:
+  # ==========================================================================
+  # Infrastructure Layer (Databases, Cache, Message Broker)
+  # ==========================================================================
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: broker-rabbitmq
@@ -8,8 +12,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -54,9 +58,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: rules_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: ${POSTGRES_RULES_DB:-rules_db}
+      POSTGRES_USER: ${POSTGRES_RULES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_RULES_PASSWORD:-postgrespassword}
     volumes:
       - postgres_rules_data:/var/lib/postgresql/data
       - ./infrastructure/postgres-rules/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -66,7 +70,7 @@ services:
           - db-postgres-rules
           - postgres-rules
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d rules_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_RULES_USER:-postgres} -d ${POSTGRES_RULES_DB:-rules_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -80,9 +84,9 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_DB: reputation_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: ${POSTGRES_REPUTATION_DB:-reputation_db}
+      POSTGRES_USER: ${POSTGRES_REPUTATION_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_REPUTATION_PASSWORD:-postgrespassword}
     volumes:
       - postgres_reputation_data:/var/lib/postgresql/data
       - ./infrastructure/postgres-reputation/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -92,7 +96,7 @@ services:
           - db-postgres-reputation
           - postgres-reputation
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d reputation_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_REPUTATION_USER:-postgres} -d ${POSTGRES_REPUTATION_DB:-reputation_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -107,9 +111,9 @@ services:
       - "8123:8123"
       - "9000:9000"
     environment:
-      CLICKHOUSE_DB: analytics_db
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: clickhousepassword
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics_db}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhousepassword}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse_data:/var/lib/clickhouse
@@ -126,6 +130,10 @@ services:
       retries: 5
       start_period: 15s
 
+  # ==========================================================================
+  # Business Microservices (6 Services)
+  # ==========================================================================
+
   service-rule-engine:
     build:
       context: .
@@ -139,11 +147,17 @@ services:
       SERVICE_NAME: service-rule-engine
       HOST: 0.0.0.0
       PORT: 8001
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db-postgres-rules:5432/rules_db
-      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_RULES_USER:-postgres}:${POSTGRES_RULES_PASSWORD:-postgrespassword}@db-postgres-rules:5432/${POSTGRES_RULES_DB:-rules_db}
+      LOG_LEVEL: ${RULE_ENGINE_LOG_LEVEL:-INFO}
     depends_on:
       postgres-rules:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       antifraud-net:
         aliases:
@@ -163,11 +177,17 @@ services:
       SERVICE_NAME: service-reputation
       HOST: 0.0.0.0
       PORT: 8002
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@db-postgres-reputation:5432/reputation_db
-      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_REPUTATION_USER:-postgres}:${POSTGRES_REPUTATION_PASSWORD:-postgrespassword}@db-postgres-reputation:5432/${POSTGRES_REPUTATION_DB:-reputation_db}
+      LOG_LEVEL: ${REPUTATION_LOG_LEVEL:-INFO}
     depends_on:
       postgres-reputation:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       antifraud-net:
         aliases:
@@ -188,10 +208,16 @@ services:
       HOST: 0.0.0.0
       PORT: 8003
       REDIS_URL: redis://cache-redis:6379/0
-      LOG_LEVEL: INFO
+      LOG_LEVEL: ${VELOCITY_LOG_LEVEL:-INFO}
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       antifraud-net:
         aliases:
@@ -214,20 +240,26 @@ services:
       RULE_ENGINE_URL: http://service-rule-engine:8001
       REPUTATION_URL: http://service-reputation:8002
       VELOCITY_URL: http://service-velocity:8003
-      RABBITMQ_URL: amqp://guest:guest@broker-rabbitmq:5672/
-      RABBITMQ_EXCHANGE: antifraud.events
-      RABBITMQ_ROUTING_KEY: inspection.completed
-      DENY_THRESHOLD: "60.0"
-      LOG_LEVEL: INFO
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@broker-rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-antifraud.events}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-inspection.completed}
+      DENY_THRESHOLD: ${DENY_THRESHOLD:-60.0}
+      LOG_LEVEL: ${SCORING_LOG_LEVEL:-INFO}
     depends_on:
       rabbitmq:
         condition: service_healthy
       service-rule-engine:
-        condition: service_started
+        condition: service_healthy
       service-reputation:
-        condition: service_started
+        condition: service_healthy
       service-velocity:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       antifraud-net:
         aliases:
@@ -249,21 +281,27 @@ services:
       PORT: 8005
       CLICKHOUSE_HOST: db-clickhouse
       CLICKHOUSE_PORT: 8123
-      CLICKHOUSE_DB: analytics_db
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: clickhousepassword
-      RABBITMQ_URL: amqp://guest:guest@broker-rabbitmq:5672/
-      RABBITMQ_EXCHANGE: antifraud.events
-      RABBITMQ_QUEUE: analytics.raw_events
-      RABBITMQ_ROUTING_KEY: inspection.completed
-      BATCH_SIZE: 50
-      FLUSH_INTERVAL_SECONDS: "2.0"
-      LOG_LEVEL: INFO
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-analytics_db}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhousepassword}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@broker-rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-antifraud.events}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-analytics.raw_events}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-inspection.completed}
+      BATCH_SIZE: ${BATCH_SIZE:-50}
+      FLUSH_INTERVAL_SECONDS: ${FLUSH_INTERVAL_SECONDS:-2.0}
+      LOG_LEVEL: ${ANALYTICS_LOG_LEVEL:-INFO}
     depends_on:
       clickhouse:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8005/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       antifraud-net:
         aliases:
@@ -284,22 +322,77 @@ services:
       HOST: 0.0.0.0
       PORT: 8006
       SQLITE_DB_PATH: /data/alerts_audit.db
-      RABBITMQ_URL: amqp://guest:guest@broker-rabbitmq:5672/
-      RABBITMQ_EXCHANGE: antifraud.events
-      RABBITMQ_QUEUE: security.alerts
-      RABBITMQ_ROUTING_KEY: inspection.completed
-      CRITICAL_RISK_THRESHOLD: "80.0"
-      LOG_LEVEL: INFO
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@broker-rabbitmq:5672/
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-antifraud.events}
+      RABBITMQ_QUEUE: ${ALERTING_RABBITMQ_QUEUE:-security.alerts}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-inspection.completed}
+      CRITICAL_RISK_THRESHOLD: ${CRITICAL_RISK_THRESHOLD:-80.0}
+      LOG_LEVEL: ${ALERTING_LOG_LEVEL:-INFO}
     volumes:
       - alerting_audit_data:/data
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8006/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       antifraud-net:
         aliases:
           - service-alerting
           - alerting
+
+  # ==========================================================================
+  # Ingress Layer (API Gateway)
+  # ==========================================================================
+
+  antifraud-gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: antifraud-gateway
+    hostname: antifraud-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SERVICE_NAME: antifraud-gateway
+      HOST: 0.0.0.0
+      PORT: 8080
+      SCORING_URL: http://service-scoring:8004
+      ANALYTICS_URL: http://service-analytics:8005
+      RULE_ENGINE_URL: http://service-rule-engine:8001
+      REPUTATION_URL: http://service-reputation:8002
+      ALERTING_URL: http://service-alerting:8006
+      API_KEYS: ${GATEWAY_API_KEYS:-antifraud-demo-key,dev-bearer-token}
+      BASIC_AUTH_USERNAME: ${GATEWAY_BASIC_USER:-antifraud}
+      BASIC_AUTH_PASSWORD: ${GATEWAY_BASIC_PASS:-antifraud-secret}
+      LOG_LEVEL: ${GATEWAY_LOG_LEVEL:-INFO}
+    depends_on:
+      service-scoring:
+        condition: service_healthy
+      service-rule-engine:
+        condition: service_healthy
+      service-reputation:
+        condition: service_healthy
+      service-analytics:
+        condition: service_healthy
+      service-alerting:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      antifraud-net:
+        aliases:
+          - antifraud-gateway
+          - gateway
 
 networks:
   antifraud-net:
