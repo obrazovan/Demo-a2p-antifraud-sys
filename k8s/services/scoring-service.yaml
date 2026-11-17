@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-scoring
+  namespace: antifraud
+  labels:
+    app: service-scoring
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: service-scoring
+  ports:
+    - name: http
+      port: 8004
+      targetPort: 8004
+      protocol: TCP

@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-rule-engine
+  namespace: antifraud
+  labels:
+    app: service-rule-engine
+    tier: backend
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-rule-engine
+  template:
+    metadata:
+      labels:
+        app: service-rule-engine
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: service-rule-engine
+          image: lab2-service-rule-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "service-rule-engine"
+            - name: PORT
+              value: "8001"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: RULES_DATABASE_URL
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: LOG_LEVEL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-scoring
+  namespace: antifraud
+  labels:
+    app: service-scoring
+    tier: backend
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: service-scoring
+  template:
+    metadata:
+      labels:
+        app: service-scoring
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: service-scoring
+          image: lab2-service-scoring:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8004
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "service-scoring"
+            - name: PORT
+              value: "8004"
+            - name: RULE_ENGINE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RULE_ENGINE_URL
+            - name: REPUTATION_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: REPUTATION_URL
+            - name: VELOCITY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: VELOCITY_URL
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: RABBITMQ_URL
+            - name: RABBITMQ_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RABBITMQ_EXCHANGE
+            - name: RABBITMQ_ROUTING_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RABBITMQ_ROUTING_KEY
+            - name: DENY_THRESHOLD
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: DENY_THRESHOLD
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: LOG_LEVEL
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8004
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

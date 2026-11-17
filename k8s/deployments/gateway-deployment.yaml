@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: antifraud-gateway
+  namespace: antifraud
+  labels:
+    app: antifraud-gateway
+    tier: gateway
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: antifraud-gateway
+  template:
+    metadata:
+      labels:
+        app: antifraud-gateway
+        tier: gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: antifraud-gateway
+          image: lab2-antifraud-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "antifraud-gateway"
+            - name: PORT
+              value: "8080"
+            - name: SCORING_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: SCORING_URL
+            - name: ANALYTICS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: ANALYTICS_URL
+            - name: RULE_ENGINE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RULE_ENGINE_URL
+            - name: REPUTATION_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: REPUTATION_URL
+            - name: ALERTING_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: ALERTING_URL
+            - name: API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: GATEWAY_API_KEYS
+            - name: BASIC_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: GATEWAY_BASIC_USER
+            - name: BASIC_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: GATEWAY_BASIC_PASS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: LOG_LEVEL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

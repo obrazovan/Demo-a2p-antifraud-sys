@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-analytics
+  namespace: antifraud
+  labels:
+    app: service-analytics
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: service-analytics
+  ports:
+    - name: http
+      port: 8005
+      targetPort: 8005
+      protocol: TCP

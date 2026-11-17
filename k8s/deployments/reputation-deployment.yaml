@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-reputation
+  namespace: antifraud
+  labels:
+    app: service-reputation
+    tier: backend
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-reputation
+  template:
+    metadata:
+      labels:
+        app: service-reputation
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: service-reputation
+          image: lab2-service-reputation:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8002
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "service-reputation"
+            - name: PORT
+              value: "8002"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: REPUTATION_DATABASE_URL
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: LOG_LEVEL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8002
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-analytics
+  namespace: antifraud
+  labels:
+    app: service-analytics
+    tier: backend
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-analytics
+  template:
+    metadata:
+      labels:
+        app: service-analytics
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: service-analytics
+          image: lab2-service-analytics:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8005
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "service-analytics"
+            - name: PORT
+              value: "8005"
+            - name: CLICKHOUSE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: CLICKHOUSE_HOST
+            - name: CLICKHOUSE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: CLICKHOUSE_PORT
+            - name: CLICKHOUSE_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: CLICKHOUSE_DB
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: CLICKHOUSE_USER
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: CLICKHOUSE_PASSWORD
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: RABBITMQ_URL
+            - name: RABBITMQ_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RABBITMQ_EXCHANGE
+            - name: RABBITMQ_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: ANALYTICS_RABBITMQ_QUEUE
+            - name: RABBITMQ_ROUTING_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RABBITMQ_ROUTING_KEY
+            - name: BATCH_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: BATCH_SIZE
+            - name: FLUSH_INTERVAL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: FLUSH_INTERVAL_SECONDS
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: LOG_LEVEL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8005
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: antifraud
+
+resources:
+  - namespace.yaml
+  - configmaps/app-configmap.yaml
+  - configmaps/db-init-configmap.yaml
+  - secrets/app-secret.yaml
+  - infrastructure/postgres-rules.yaml
+  - infrastructure/postgres-reputation.yaml
+  - infrastructure/redis.yaml
+  - infrastructure/rabbitmq.yaml
+  - infrastructure/clickhouse.yaml
+  - deployments/rule-engine-deployment.yaml
+  - deployments/reputation-deployment.yaml
+  - deployments/velocity-deployment.yaml
+  - deployments/scoring-deployment.yaml
+  - deployments/analytics-deployment.yaml
+  - deployments/alerting-deployment.yaml
+  - deployments/gateway-deployment.yaml
+  - services/rule-engine-service.yaml
+  - services/reputation-service.yaml
+  - services/velocity-service.yaml
+  - services/scoring-service.yaml
+  - services/analytics-service.yaml
+  - services/alerting-service.yaml
+  - services/gateway-service.yaml

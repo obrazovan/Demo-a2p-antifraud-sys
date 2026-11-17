@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alerting-audit-pvc
+  namespace: antifraud
+  labels:
+    app: service-alerting
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-alerting
+  namespace: antifraud
+  labels:
+    app: service-alerting
+    tier: backend
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: service-alerting
+  template:
+    metadata:
+      labels:
+        app: service-alerting
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: service-alerting
+          image: lab2-service-alerting:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8006
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "service-alerting"
+            - name: PORT
+              value: "8006"
+            - name: SQLITE_DB_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: SQLITE_DB_PATH
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: RABBITMQ_URL
+            - name: RABBITMQ_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RABBITMQ_EXCHANGE
+            - name: RABBITMQ_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: ALERTING_RABBITMQ_QUEUE
+            - name: RABBITMQ_ROUTING_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: RABBITMQ_ROUTING_KEY
+            - name: CRITICAL_RISK_THRESHOLD
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: CRITICAL_RISK_THRESHOLD
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: LOG_LEVEL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8006
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8006
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: alerting-audit-storage
+              mountPath: /data
+      volumes:
+        - name: alerting-audit-storage
+          persistentVolumeClaim:
+            claimName: alerting-audit-pvc
