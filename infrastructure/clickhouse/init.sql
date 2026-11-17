@@ -1,5 +1,5 @@
 -- Schema for analytics_db (ClickHouse 23.8)
--- Microservice: Analytics Ingest & Reporting Service
+-- Microservice: Analytics Ingestion & Reporting Service
 
 CREATE DATABASE IF NOT EXISTS analytics_db;
 
@@ -15,5 +15,4 @@ CREATE TABLE IF NOT EXISTS analytics_db.sms_inspections (
     reasons Array(String)
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(event_time)
-ORDER BY (event_time, verdict, mcc_mnc, request_id);
-
+ORDER BY (event_time, verdict, mcc_mnc);

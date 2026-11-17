@@ -234,6 +234,42 @@ services:
           - service-scoring
           - scoring
 
+  service-analytics:
+    build:
+      context: .
+      dockerfile: services/analytics/Dockerfile
+    container_name: service-analytics
+    hostname: service-analytics
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    environment:
+      SERVICE_NAME: service-analytics
+      HOST: 0.0.0.0
+      PORT: 8005
+      CLICKHOUSE_HOST: db-clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DB: analytics_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhousepassword
+      RABBITMQ_URL: amqp://guest:guest@broker-rabbitmq:5672/
+      RABBITMQ_EXCHANGE: antifraud.events
+      RABBITMQ_QUEUE: analytics.raw_events
+      RABBITMQ_ROUTING_KEY: inspection.completed
+      BATCH_SIZE: 50
+      FLUSH_INTERVAL_SECONDS: "2.0"
+      LOG_LEVEL: INFO
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      antifraud-net:
+        aliases:
+          - service-analytics
+          - analytics
+
 networks:
   antifraud-net:
     name: antifraud-net

@@ -27,8 +27,9 @@ See [`system_architecture_specification.md`](./system_architecture_specification
 | 3 | **Reputation Service** | Implemented | `8002` | FastAPI, asyncpg (`reputation_db`), blacklist lookup & management, seed bad actors, JSON logs, tests |
 | 4 | **Velocity Service** | Implemented | `8003` | FastAPI, `redis.asyncio`, Redis Sorted Set sliding window (60s IP / 300s phone), fail-open fallback, tests |
 | 5 | **Scoring Service** | Implemented | `8004` | FastAPI, `httpx`, `aio_pika`, parallel orchestration, TTL rule cache, Risk Score (`>= 60` DENY), RabbitMQ publish |
-| 6 | Analytics & Alerting Services | Planned | `8005` / `8006` | RabbitMQ consumers, ClickHouse bulk ingest, CEF audit alerts |
-| 7 | API Gateway & E2E Tests | Planned | `8080` | Ingress auth, `X-Request-ID` injection, routing |
+| 6 | **Analytics Service** | Implemented | `8005` | FastAPI, `aio_pika`, `clickhouse-connect`, RabbitMQ batch ingest (50 items / 2s), ClickHouse `sms_inspections`, `/api/v1/stats/summary` |
+| 7 | Alerting Service | Planned | `8006` | RabbitMQ consumer, CEF audit alerts |
+| 8 | API Gateway & E2E Tests | Planned | `8080` | Ingress auth, `X-Request-ID` injection, routing |
 
 ---
 
@@ -47,7 +48,7 @@ See [`system_architecture_specification.md`](./system_architecture_specification
 │   ├── reputation/             # Reputation microservice (FastAPI + PostgreSQL)
 │   ├── velocity/               # Velocity microservice (FastAPI + Redis)
 │   ├── scoring/                # Scoring Engine microservice (FastAPI + httpx + RabbitMQ)
-│   ├── analytics/              # Analytics consumer & reporting (planned)
+│   ├── analytics/              # Analytics Ingestion & Reporting (FastAPI + RabbitMQ + ClickHouse)
 │   └── alerting/               # Security Alerting consumer (planned)
 ├── shared/                     # Shared Pydantic DTOs & structured JSON logger
 ├── tests/                      # Cross-service unit & integration tests
@@ -93,6 +94,11 @@ docker compose ps
   - Readiness (`rabbitmq`): `GET http://localhost:8004/ready`
   - Swagger UI: `http://localhost:8004/docs`
   - Score SMS check request: `POST http://localhost:8004/api/v1/score`
+- **Analytics Service (`8005`):**
+  - Liveness: `GET http://localhost:8005/health`
+  - Readiness (`clickhouse`): `GET http://localhost:8005/ready`
+  - Swagger UI: `http://localhost:8005/docs`
+  - Last-hour traffic summary: `GET http://localhost:8005/api/v1/stats/summary`
 
 ---
 
@@ -101,7 +107,7 @@ docker compose ps
 Install service dependencies and run the test suite:
 
 ```bash
-pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt -r services/velocity/requirements.txt -r services/scoring/requirements.txt
+pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt -r services/velocity/requirements.txt -r services/scoring/requirements.txt -r services/analytics/requirements.txt
 python -m pytest -v
 ```
 
