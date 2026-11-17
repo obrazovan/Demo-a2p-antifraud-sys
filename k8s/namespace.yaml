@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: antifraud
+  labels:
+    app.kubernetes.io/name: antifraud
+    app.kubernetes.io/part-of: a2p-antifraud-platform

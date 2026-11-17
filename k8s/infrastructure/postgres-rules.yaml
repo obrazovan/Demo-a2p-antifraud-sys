@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-rules-pvc
+  namespace: antifraud
+  labels:
+    app: db-postgres-rules
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-postgres-rules
+  namespace: antifraud
+  labels:
+    app: db-postgres-rules
+    tier: database
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: db-postgres-rules
+  template:
+    metadata:
+      labels:
+        app: db-postgres-rules
+        tier: database
+    spec:
+      containers:
+        - name: postgres-rules
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: POSTGRES_RULES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: antifraud-config
+                  key: POSTGRES_RULES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: antifraud-secrets
+                  key: POSTGRES_RULES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: postgres-rules-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: rules-init.sql
+              readOnly: true
+      volumes:
+        - name: postgres-rules-storage
+          persistentVolumeClaim:
+            claimName: postgres-rules-pvc
+        - name: init-sql
+          configMap:
+            name: antifraud-db-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-postgres-rules
+  namespace: antifraud
+  labels:
+    app: db-postgres-rules
+    app.kubernetes.io/part-of: a2p-antifraud-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: db-postgres-rules
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
