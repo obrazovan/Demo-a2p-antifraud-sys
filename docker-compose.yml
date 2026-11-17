@@ -198,6 +198,42 @@ services:
           - service-velocity
           - velocity
 
+  service-scoring:
+    build:
+      context: .
+      dockerfile: services/scoring/Dockerfile
+    container_name: service-scoring
+    hostname: service-scoring
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    environment:
+      SERVICE_NAME: service-scoring
+      HOST: 0.0.0.0
+      PORT: 8004
+      RULE_ENGINE_URL: http://service-rule-engine:8001
+      REPUTATION_URL: http://service-reputation:8002
+      VELOCITY_URL: http://service-velocity:8003
+      RABBITMQ_URL: amqp://guest:guest@broker-rabbitmq:5672/
+      RABBITMQ_EXCHANGE: antifraud.events
+      RABBITMQ_ROUTING_KEY: inspection.completed
+      DENY_THRESHOLD: "60.0"
+      LOG_LEVEL: INFO
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      service-rule-engine:
+        condition: service_started
+      service-reputation:
+        condition: service_started
+      service-velocity:
+        condition: service_started
+    networks:
+      antifraud-net:
+        aliases:
+          - service-scoring
+          - scoring
+
 networks:
   antifraud-net:
     name: antifraud-net
