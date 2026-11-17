@@ -42,6 +42,11 @@ ENV/
 # Docker local overrides
 docker-compose.override.yml
 
+# Local SQLite audit databases
+*.db
+*.db-wal
+*.db-shm
+
 # IDE / Editors
 .vscode/
 .idea/

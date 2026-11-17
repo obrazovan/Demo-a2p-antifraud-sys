@@ -28,7 +28,7 @@ See [`system_architecture_specification.md`](./system_architecture_specification
 | 4 | **Velocity Service** | Implemented | `8003` | FastAPI, `redis.asyncio`, Redis Sorted Set sliding window (60s IP / 300s phone), fail-open fallback, tests |
 | 5 | **Scoring Service** | Implemented | `8004` | FastAPI, `httpx`, `aio_pika`, parallel orchestration, TTL rule cache, Risk Score (`>= 60` DENY), RabbitMQ publish |
 | 6 | **Analytics Service** | Implemented | `8005` | FastAPI, `aio_pika`, `clickhouse-connect`, RabbitMQ batch ingest (50 items / 2s), ClickHouse `sms_inspections`, `/api/v1/stats/summary` |
-| 7 | Alerting Service | Planned | `8006` | RabbitMQ consumer, CEF audit alerts |
+| 7 | **Alerting Service** | Implemented | `8006` | FastAPI, `aio_pika`, `aiosqlite`, CEF security alerts on DENY / risk >= 80, WARNING/ERROR JSON logs, `/api/v1/alerts` |
 | 8 | API Gateway & E2E Tests | Planned | `8080` | Ingress auth, `X-Request-ID` injection, routing |
 
 ---
@@ -49,7 +49,7 @@ See [`system_architecture_specification.md`](./system_architecture_specification
 │   ├── velocity/               # Velocity microservice (FastAPI + Redis)
 │   ├── scoring/                # Scoring Engine microservice (FastAPI + httpx + RabbitMQ)
 │   ├── analytics/              # Analytics Ingestion & Reporting (FastAPI + RabbitMQ + ClickHouse)
-│   └── alerting/               # Security Alerting consumer (planned)
+│   └── alerting/               # Security Alerting & CEF Audit (FastAPI + RabbitMQ + SQLite)
 ├── shared/                     # Shared Pydantic DTOs & structured JSON logger
 ├── tests/                      # Cross-service unit & integration tests
 ├── docker-compose.yml          # Local & container orchestration
@@ -99,6 +99,11 @@ docker compose ps
   - Readiness (`clickhouse`): `GET http://localhost:8005/ready`
   - Swagger UI: `http://localhost:8005/docs`
   - Last-hour traffic summary: `GET http://localhost:8005/api/v1/stats/summary`
+- **Alerting Service (`8006`):**
+  - Liveness: `GET http://localhost:8006/health`
+  - Readiness (`sqlite` + `rabbitmq`): `GET http://localhost:8006/ready`
+  - Swagger UI: `http://localhost:8006/docs`
+  - Last 50 security alerts: `GET http://localhost:8006/api/v1/alerts`
 
 ---
 
@@ -107,7 +112,7 @@ docker compose ps
 Install service dependencies and run the test suite:
 
 ```bash
-pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt -r services/velocity/requirements.txt -r services/scoring/requirements.txt -r services/analytics/requirements.txt
+pip install -r services/rule-engine/requirements.txt -r services/reputation/requirements.txt -r services/velocity/requirements.txt -r services/scoring/requirements.txt -r services/analytics/requirements.txt -r services/alerting/requirements.txt
 python -m pytest -v
 ```
 

@@ -270,6 +270,37 @@ services:
           - service-analytics
           - analytics
 
+  service-alerting:
+    build:
+      context: .
+      dockerfile: services/alerting/Dockerfile
+    container_name: service-alerting
+    hostname: service-alerting
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    environment:
+      SERVICE_NAME: service-alerting
+      HOST: 0.0.0.0
+      PORT: 8006
+      SQLITE_DB_PATH: /data/alerts_audit.db
+      RABBITMQ_URL: amqp://guest:guest@broker-rabbitmq:5672/
+      RABBITMQ_EXCHANGE: antifraud.events
+      RABBITMQ_QUEUE: security.alerts
+      RABBITMQ_ROUTING_KEY: inspection.completed
+      CRITICAL_RISK_THRESHOLD: "80.0"
+      LOG_LEVEL: INFO
+    volumes:
+      - alerting_audit_data:/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      antifraud-net:
+        aliases:
+          - service-alerting
+          - alerting
+
 networks:
   antifraud-net:
     name: antifraud-net
@@ -286,3 +317,5 @@ volumes:
     name: antifraud_postgres_reputation_data
   clickhouse_data:
     name: antifraud_clickhouse_data
+  alerting_audit_data:
+    name: antifraud_alerting_audit_data
