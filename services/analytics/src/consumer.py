@@ -76,42 +76,61 @@ class AnalyticsConsumer:
             and not self._channel.is_closed
         )
 
-    async def start(self) -> None:
-        """Connects to RabbitMQ, binds 'analytics.raw_events', and starts flush loop."""
+    async def start(self, max_retries: int = 10, retry_delay: float = 1.5) -> None:
+        """Connects to RabbitMQ (with startup retries), binds 'analytics.raw_events', and starts flush loop."""
         self._running = True
         self._flush_task = asyncio.create_task(self._periodic_flush_loop())
 
-        self._connection = await aio_pika.connect_robust(
-            self.rabbitmq_url,
-            timeout=settings.RABBITMQ_CONNECT_TIMEOUT,
-        )
-        self._channel = await self._connection.channel()
-        await self._channel.set_qos(prefetch_count=self.prefetch_count)
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                self._connection = await aio_pika.connect_robust(
+                    self.rabbitmq_url,
+                    timeout=settings.RABBITMQ_CONNECT_TIMEOUT,
+                )
+                self._channel = await self._connection.channel()
+                await self._channel.set_qos(prefetch_count=self.prefetch_count)
 
-        exchange = await self._channel.declare_exchange(
-            self.exchange_name,
-            aio_pika.ExchangeType.TOPIC,
-            durable=True,
-        )
-        self._queue = await self._channel.declare_queue(
-            self.queue_name,
-            durable=True,
-        )
-        await self._queue.bind(exchange, routing_key=self.routing_key)
+                exchange = await self._channel.declare_exchange(
+                    self.exchange_name,
+                    aio_pika.ExchangeType.TOPIC,
+                    durable=True,
+                )
+                self._queue = await self._channel.declare_queue(
+                    self.queue_name,
+                    durable=True,
+                )
+                await self._queue.bind(exchange, routing_key=self.routing_key)
 
-        self._consumer_tag = await self._queue.consume(
-            self.handle_message,
-            no_ack=False,
-        )
-        logger.info(
-            "Analytics consumer listening on queue '%s' (exchange='%s', routing_key='%s', "
-            "batch_size=%d, flush_interval=%.1fs)",
-            self.queue_name,
-            self.exchange_name,
-            self.routing_key,
-            self.batch_size,
-            self.flush_interval,
-        )
+                self._consumer_tag = await self._queue.consume(
+                    self.handle_message,
+                    no_ack=False,
+                )
+                logger.info(
+                    "Analytics consumer listening on queue '%s' (exchange='%s', routing_key='%s', "
+                    "batch_size=%d, flush_interval=%.1fs)",
+                    self.queue_name,
+                    self.exchange_name,
+                    self.routing_key,
+                    self.batch_size,
+                    self.flush_interval,
+                )
+                return
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "Analytics RabbitMQ connect attempt %d/%d failed (%s: %s); retrying in %.1fs",
+                    attempt,
+                    max_retries,
+                    type(exc).__name__,
+                    exc,
+                    retry_delay,
+                )
+                if attempt < max_retries:
+                    await asyncio.sleep(retry_delay)
+
+        if last_exc is not None:
+            raise last_exc
 
     async def stop(self) -> None:
         """Cancels consumer, flushes any remaining buffered events, and closes AMQP."""

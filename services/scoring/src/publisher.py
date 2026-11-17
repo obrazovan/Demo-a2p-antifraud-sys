@@ -36,22 +36,41 @@ class RabbitMQPublisher:
         self._channel: Optional[AbstractChannel] = None
         self._exchange: Optional[AbstractExchange] = None
 
-    async def connect(self) -> None:
-        """Establishes a robust AMQP connection and declares the durable topic exchange."""
-        self._connection = await aio_pika.connect_robust(
-            self.rabbitmq_url,
-            timeout=settings.RABBITMQ_CONNECT_TIMEOUT,
-        )
-        self._channel = await self._connection.channel()
-        self._exchange = await self._channel.declare_exchange(
-            self.exchange_name,
-            aio_pika.ExchangeType.TOPIC,
-            durable=True,
-        )
-        logger.info(
-            "Connected to RabbitMQ and declared durable topic exchange '%s'",
-            self.exchange_name,
-        )
+    async def connect(self, max_retries: int = 10, retry_delay: float = 1.5) -> None:
+        """Establishes a robust AMQP connection (with startup retries) and declares the exchange."""
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                self._connection = await aio_pika.connect_robust(
+                    self.rabbitmq_url,
+                    timeout=settings.RABBITMQ_CONNECT_TIMEOUT,
+                )
+                self._channel = await self._connection.channel()
+                self._exchange = await self._channel.declare_exchange(
+                    self.exchange_name,
+                    aio_pika.ExchangeType.TOPIC,
+                    durable=True,
+                )
+                logger.info(
+                    "Connected to RabbitMQ and declared durable topic exchange '%s'",
+                    self.exchange_name,
+                )
+                return
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "RabbitMQ connect attempt %d/%d failed (%s: %s); retrying in %.1fs",
+                    attempt,
+                    max_retries,
+                    type(exc).__name__,
+                    exc,
+                    retry_delay,
+                )
+                if attempt < max_retries:
+                    await asyncio.sleep(retry_delay)
+
+        if last_exc is not None:
+            raise last_exc
 
     async def close(self) -> None:
         """Closes the AMQP channel and connection gracefully."""

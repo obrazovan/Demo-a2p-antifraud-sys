@@ -22,10 +22,10 @@ services:
           - broker-rabbitmq
           - rabbitmq
     healthcheck:
-      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_port_connectivity"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 15s
 
   redis:
