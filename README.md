@@ -1,5 +1,7 @@
 # Demo A2P Anti-Fraud System (`Demo-a2p-antifraud-sys`)
 
+[![Production CI/CD Pipeline](https://github.com/obrazovan/Demo-a2p-antifraud-sys/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/obrazovan/Demo-a2p-antifraud-sys/actions/workflows/ci-cd.yml)
+
 ## 1. Описание проекта
 
 **Demo A2P Anti-Fraud System** — распределённая микросервисная платформа превентивной инспекции A2P SMS-трафика аутентификации, разработанная для обнаружения и блокировки атак **SMS Pumping / Artificial Inflation of Traffic (AIT)** и **Denial of Wallet** в реальном времени.
@@ -7,6 +9,7 @@
 Репозиторий объединяет:
 - **Лабораторную работу №2 (Микросервисная архитектура):** API Gateway + 6 независимых backend-микросервисов с паттерном *Database-per-Service*, синхронным (`REST/httpx`) и асинхронным (`RabbitMQ/aio_pika`) взаимодействием.
 - **Лабораторную работу №3 (Docker и Kubernetes):** оптимизированные multi-stage `Dockerfile` (non-root `appuser`, `.dockerignore`), оркестрация `docker-compose.yml` и полный комплект манифестов Kubernetes в [`k8s/`](./k8s/README.md) (`Namespace`, `ConfigMap`, `Secret`, `PersistentVolumeClaim`, `Deployment`, `Service`, Kustomize).
+- **Production CI/CD Pipeline (GitHub Actions):** полный 5-этапный конвейер [`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml) — статический анализ (Ruff + проверки Dockerfiles), 66 автотестов (Unit, Integration, K8s), строгая валидация манифестов (`kubeconform`), матричная сборка и Trivy-сканирование всех 7 образов с публикацией в GHCR, а также Continuous Deployment в Kubernetes.
 
 Полная архитектурная спецификация: [`system_architecture_specification.md`](./system_architecture_specification.md).  
 Документация по развёртыванию в Kubernetes: [`k8s/README.md`](./k8s/README.md).
