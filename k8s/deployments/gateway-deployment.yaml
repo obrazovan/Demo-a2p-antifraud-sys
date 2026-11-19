@@ -23,7 +23,7 @@ spec:
         runAsUser: 1001
       containers:
         - name: antifraud-gateway
-          image: lab2-antifraud-gateway:latest
+          image: lab2-antifraud-gateway:v2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
